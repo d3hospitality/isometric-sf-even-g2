@@ -4,6 +4,7 @@ import { defaultProfile, height, labels, levelsOptions, luminance, opacityOption
 import { connectGlasses } from './glasses.ts'
 import { drawLocalImage, drawSample, loadSfMap } from './source.ts'
 import { mapModes } from './map-controls.ts'
+import { makeOpticsTarget, opticsMenuItem } from './optics.ts'
 import './style.css'
 
 const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -38,6 +39,9 @@ let centerX = width / 2
 let centerY = height / 2
 let zoom = 1
 let mapMode: typeof mapModes[number] = mapModes[0]
+const opticsTarget = makeOpticsTarget()
+let opticsOpen = false
+let showOpticsTarget = true
 let mapCue = ' '
 let cueTimer: ReturnType<typeof setTimeout> | undefined
 let selected = [...defaults]
@@ -96,6 +100,11 @@ function resetView() {
 
 function moveMap(direction: 1 | -1) {
   if (loadingDefaultMap || stage !== 3 || !saved) return
+  if (opticsOpen) {
+    showOpticsTarget = direction === 1
+    refreshPreview()
+    return
+  }
   const cropWidth = baseWidth / zoom
   if (mapMode.itemName === 'Zoom') {
     const minZoom = baseWidth / Math.min(sfMap?.width ?? mapImage.width,
@@ -111,8 +120,16 @@ function moveMap(direction: 1 | -1) {
 
 function chooseMapMode(id: number) {
   if (stage !== 3 || !saved) return
+  if (id === opticsMenuItem.itemID) {
+    opticsOpen = !opticsOpen
+    showOpticsTarget = true
+    updateMapControls()
+    refreshPreview()
+    return
+  }
   const mode = mapModes.find(item => item.itemID === id)
   if (!mode) return
+  opticsOpen = false
   mapMode = mode
   mapCue = `${mode.itemName}  |  ${mode.up} / ${mode.down}`
   clearTimeout(cueTimer)
@@ -266,14 +283,14 @@ function paint(canvas: HTMLCanvasElement, frame: Uint8Array) {
 }
 
 function showPreview() {
-  if (original.checked) preview.getContext('2d')!.drawImage(source, 0, 0)
+  if (original.checked && !opticsOpen) preview.getContext('2d')!.drawImage(source, 0, 0)
   else paint(preview, activeFrame)
 }
 
 function refreshPreview() {
   const previous = activeFrame
   const previousCue = activeCue
-  activeCue = stage === 3 && saved ? mapCue : ' '
+  activeCue = stage === 3 && saved && !opticsOpen ? mapCue : ' '
   if (stage < 3) {
     const value = dialPosition()
     dial.value = scaleValue(value)
@@ -282,13 +299,16 @@ function refreshPreview() {
     byId('scale-label').textContent = ['Opacity', 'Levels gamma', 'Dither strength'][stage]
     activeCue = `${stages[stage]}  ${scaleValue(value)}/100  |  Hold to lock`
   }
-  activeFrame = renderFrame(sourcePixels, profile(selected[stage] ?? 0))
+  activeFrame = opticsOpen && showOpticsTarget
+    ? opticsTarget
+    : renderFrame(sourcePixels, profile(selected[stage] ?? 0))
   if (previous && activeFrame.every((pixel, index) => pixel === previous[index])) activeFrame = previous
   showPreview()
   if (activeFrame !== previous || activeCue !== previousCue) submitToGlasses?.(activeFrame, activeCue)
 }
 
 function refresh(focusChoice = false) {
+  if (stage !== 3 || !saved) opticsOpen = false
   choices.replaceChildren()
   byId('stepper').textContent = [...stages, 'Review'].map((name, index) =>
     index === stage ? `[${name}]` : name).join('  →  ')
@@ -383,13 +403,19 @@ const modeButtons = mapModes.map(mode => {
 })
 
 function updateMapControls() {
-  modeButtons.forEach((button, i) => button.setAttribute('aria-pressed', String(mapModes[i] === mapMode)))
-  byId('map-up').textContent = mapMode.up
-  byId('map-down').textContent = mapMode.down
+  modeButtons.forEach((button, i) => button.setAttribute('aria-pressed', String(!opticsOpen && mapModes[i] === mapMode)))
+  byId('optics-check').setAttribute('aria-pressed', String(opticsOpen))
+  byId('map-up').textContent = opticsOpen ? 'Show test pattern' : mapMode.up
+  byId('map-down').textContent = opticsOpen ? 'Show map' : mapMode.down
+  byId<HTMLButtonElement>('map-home').disabled = opticsOpen
+  byId('map-help').textContent = opticsOpen
+    ? 'Swipe up for the test pattern and down for the map. Check for glow in the black squares and whether the fine lines stay separate.'
+    : 'On G2, tap then hold to open the contextual menu.'
 }
 
 byId('map-up').onclick = () => moveMap(1)
 byId('map-down').onclick = () => moveMap(-1)
+byId('optics-check').onclick = () => chooseMapMode(opticsMenuItem.itemID)
 byId('map-home').onclick = () => {
   if (loadingDefaultMap) return
   resetView()
@@ -479,7 +505,9 @@ async function loadDefaultMap() {
     fileInput.disabled = false
   }
 }
-const sourceReady = loadDefaultMap()
+const sampleOnly = new URLSearchParams(location.search).get('sample') === '1'
+if (sampleOnly) loadingDefaultMap = false
+const sourceReady = sampleOnly ? Promise.resolve() : loadDefaultMap()
 const status = (message: string) => { byId('device').textContent = message }
 void Promise.all([connectGlasses(input, status, chooseMapMode), sourceReady]).then(([send]) => {
   submitToGlasses = send

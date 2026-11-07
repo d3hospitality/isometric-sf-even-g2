@@ -2,6 +2,16 @@
 
 A map viewer and display fitting prototype for the Even G2. It opens in downtown San Francisco with the display profile locked at **80% opacity, Strong Contrast, and Ordered 4 × 4**. Move around the map with the glasses or phone controls, or select **Fit again** to adjust the display profile.
 
+## Screenshots
+
+The screenshots use the included original calibration map. Open the app with `?sample=1` to reproduce them.
+
+| Web app | Even Hub simulator |
+| --- | --- |
+| ![Web app with the calibration map and movement controls](docs/screenshots/web-app.png) | ![Simulated G2 display with the calibration map](docs/screenshots/glasses-simulator.png) |
+
+![Simulated G2 optics target with brightness steps, dark cutouts and fine lines](docs/screenshots/optics-target.png)
+
 ## Run
 
 Use Node 24. From this project folder, run:
@@ -22,6 +32,14 @@ Open http://localhost:5173. Select an A–D starting preset on the phone, then u
 5. With the view locked, tap then hold to open the glasses contextual menu. Select **Zoom** for in/out, **Pan** for right/left, or **Scroll** for up/down. The phone has matching mode and direction buttons. The custom menu requires Even App 2.2.9 or later.
 
 Zoom out before traversing long stretches of the map. **Reset view** on the phone returns to the original downtown view.
+
+## Check the image on physical G2 lenses
+
+1. With the map locked, tap then hold and select **Optics check**. Swipe up for the reference target and down for the map at the same position and zoom. Select **Optics check** again to return to navigation.
+2. In dim and bright surroundings, check whether the black cutouts in the bright blocks stay dark, which brightness steps you can distinguish, and whether the 1-, 2-, and 4-pixel bars stay separate. Look for a break where the test marks cross the tile joins.
+3. Swipe down and check whether bright roofs wash out neighboring streets and whether you can still pick out thin building edges. Use **Fit again** to compare settings if those details are hard to read.
+
+Record the ambient conditions, G2 brightness, finest bars you can distinguish, any visible glow, and which map profile preserves the most detail. Physical G2 results are pending. The simulator screenshots show the submitted frame and cannot establish lens brightness or light bleed.
 
 ```sh
 npx --package @evenrealities/evenhub-cli evenhub qr --url http://YOUR-LAN-IP:5173

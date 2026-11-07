@@ -6,6 +6,7 @@ import {
 } from '@evenrealities/even_hub_sdk'
 import { height, splitFrame, tiles, tileHeight, tileWidth, width } from './frame.ts'
 import { mapModes } from './map-controls.ts'
+import { opticsMenuItem } from './optics.ts'
 
 export async function connectGlasses(
   input: (event: Event) => void,
@@ -16,7 +17,7 @@ export async function connectGlasses(
   const result = await bridge.createStartUpPageContainer(new CreateStartUpPageContainer({
     containerTotalNum: 6,
     menuObject: new MenuContainerProperty({
-      menuItems: mapModes.map(({ itemID, itemName }) => new MenuItemProperty({ itemID, itemName })),
+      menuItems: [...mapModes, opticsMenuItem].map(({ itemID, itemName }) => new MenuItemProperty({ itemID, itemName })),
     }),
     textObject: [
       new TextContainerProperty({
