@@ -1,23 +1,26 @@
 import {
   CreateStartUpPageContainer, EventSourceType, ImageContainerProperty, ImageRawDataUpdate,
   ImageRawDataUpdateResult, OsEventTypeList as Event, StartUpPageCreateResult,
-  MenuContainerProperty, MenuItemProperty,
+  MenuContainerProperty, MenuItemProperty, RebuildPageContainer,
   TextContainerProperty, TextContainerUpgrade, waitForEvenAppBridge,
 } from '@evenrealities/even_hub_sdk'
-import { height, splitFrame, tiles, tileHeight, tileWidth, width } from './frame.ts'
-import { mapModes } from './map-controls.ts'
+import { height, imageLayout, splitFrame, width, type TileCount } from './frame.ts'
+import { effectMenuItem, layoutMenuItem, mapModes } from './map-controls.ts'
 import { opticsMenuItem } from './optics.ts'
 
 export async function connectGlasses(
   input: (event: Event) => void,
   status: (message: string) => void,
   chooseMode: (itemID: number) => void,
+  initialCount: TileCount,
+  report: (message: string) => void,
 ) {
   const bridge = await waitForEvenAppBridge()
-  const result = await bridge.createStartUpPageContainer(new CreateStartUpPageContainer({
-    containerTotalNum: 6,
+  const page = (count: TileCount) => ({
+    containerTotalNum: count + 2,
     menuObject: new MenuContainerProperty({
-      menuItems: [...mapModes, opticsMenuItem].map(({ itemID, itemName }) => new MenuItemProperty({ itemID, itemName })),
+      menuItems: [...mapModes, opticsMenuItem, layoutMenuItem, effectMenuItem]
+        .map(({ itemID, itemName }) => new MenuItemProperty({ itemID, itemName })),
     }),
     textObject: [
       new TextContainerProperty({
@@ -29,19 +32,19 @@ export async function connectGlasses(
         width: 360, height: 32, content: ' ', zOrderIndex: 5,
       }),
     ],
-    imageObject: tiles.map((tile, index) => new ImageContainerProperty({
-      ...tile, width: tileWidth, height: tileHeight, zOrderIndex: index + 1,
+    imageObject: imageLayout(count).map((tile, index) => new ImageContainerProperty({
+      ...tile, zOrderIndex: index + 1,
     })),
-  }))
+  })
+  const result = await bridge.createStartUpPageContainer(new CreateStartUpPageContainer(page(initialCount)))
   if (result !== StartUpPageCreateResult.success) throw new Error(`Glasses startup: ${result}`)
 
   const canvas = document.createElement('canvas')
-  canvas.width = tileWidth
-  canvas.height = tileHeight
   const ctx = canvas.getContext('2d')!
-  const image = ctx.createImageData(tileWidth, tileHeight)
-  let pending: { frame: Uint8Array; cue: string } | undefined
+  let activeCount = initialCount
+  let pending: { frame: Uint8Array; cue: string; count: TileCount } | undefined
   let displayedFrame: Uint8Array | undefined
+  let displayedTiles: (Uint8Array | undefined)[] = []
   let displayedCue = ' '
   let timer: ReturnType<typeof setTimeout> | undefined
   let sending = false
@@ -82,15 +85,34 @@ export async function connectGlasses(
   async function flush() {
     if (sending || !pending || closed) return
     sending = true
-    status('Updating four tiles…')
+    status('Updating glasses…')
     try {
-      while (pending && !closed) {
-        const { frame, cue } = pending
+      frames: while (pending && !closed) {
+        const { frame, cue, count } = pending
         pending = undefined
-        if (frame !== displayedFrame) {
+        if (count !== activeCount) {
+          const updated = await bridge.rebuildPageContainer(new RebuildPageContainer(page(count)))
+          if (!updated) throw new Error('Could not change image layout')
+          activeCount = count
           displayedFrame = undefined
-          for (const [index, pixels] of splitFrame(frame).entries()) {
+          displayedTiles = []
+          displayedCue = ' '
+        }
+        if (frame !== displayedFrame) {
+          const started = performance.now()
+          let sent = 0
+          let bytes = 0
+          displayedFrame = undefined
+          const layout = imageLayout(count)
+          for (const [index, pixels] of splitFrame(frame, count).entries()) {
             if (closed) return
+            if (pending) continue frames
+            const previous = displayedTiles[index]
+            if (previous && pixels.every((pixel, i) => pixel === previous[i])) continue
+            const tile = layout[index]
+            canvas.width = tile.width
+            canvas.height = tile.height
+            const image = ctx.createImageData(tile.width, tile.height)
             pixels.forEach((level, i) => {
               const offset = i * 4
               const shade = level * 17
@@ -99,14 +121,20 @@ export async function connectGlasses(
             })
             ctx.putImageData(image, 0, 0)
             const png = canvas.toDataURL('image/png').split(',')[1]
+            const imageData = Uint8Array.from(atob(png), char => char.charCodeAt(0))
             const result = await bridge.updateImageRawData(new ImageRawDataUpdate({
-              containerID: tiles[index].containerID,
-              containerName: tiles[index].containerName,
-              imageData: Uint8Array.from(atob(png), char => char.charCodeAt(0)),
+              containerID: tile.containerID, containerName: tile.containerName, imageData,
             }))
-            if (!ImageRawDataUpdateResult.isSuccess(result)) throw new Error(`${tiles[index].containerName}: ${result}`)
+            if (!ImageRawDataUpdateResult.isSuccess(result)) {
+              displayedTiles[index] = undefined
+              throw new Error(`${tile.containerName}: ${result}`)
+            }
+            displayedTiles[index] = pixels
+            sent++
+            bytes += imageData.length
           }
           displayedFrame = frame
+          report(`${sent}/${count} tiles sent · ${(bytes / 1024).toFixed(1)} KiB PNG · ${Math.round(performance.now() - started)} ms SDK update`)
         }
         if (cue !== displayedCue && !closed) {
           const updated = await bridge.textContainerUpgrade(new TextContainerUpgrade({
@@ -123,14 +151,14 @@ export async function connectGlasses(
       status(`Glasses update failed · ${String(error)}`)
     } finally {
       sending = false
-      if (pending && !closed) timer = setTimeout(flush, 80)
+      if (pending && !closed) timer = setTimeout(flush, 25)
     }
   }
 
-  return (frame: Uint8Array, cue: string) => {
-    pending = { frame, cue }
+  return (frame: Uint8Array, cue: string, count: TileCount) => {
+    pending = { frame, cue, count }
     current = false
     clearTimeout(timer)
-    if (!sending) timer = setTimeout(flush, 80)
+    if (!sending) timer = setTimeout(flush, 25)
   }
 }

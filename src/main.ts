@@ -1,9 +1,9 @@
 import { OsEventTypeList as Event } from '@evenrealities/even_hub_sdk'
 import { defaultProfile, height, labels, levelsOptions, luminance, opacityOptions, renderFrame,
-  stages, width, type Profile } from './frame.ts'
+  imageLayout, refreshEffects, stages, width, type Profile, type RefreshEffect, type TileCount } from './frame.ts'
 import { connectGlasses } from './glasses.ts'
 import { drawLocalImage, drawSample, loadSfMap } from './source.ts'
-import { mapModes } from './map-controls.ts'
+import { effectMenuItem, layoutMenuItem, mapModes } from './map-controls.ts'
 import { makeOpticsTarget, opticsMenuItem } from './optics.ts'
 import './style.css'
 
@@ -47,7 +47,12 @@ let cueTimer: ReturnType<typeof setTimeout> | undefined
 let selected = [...defaults]
 let stage = 3
 let saved = true
-let submitToGlasses: ((frame: Uint8Array, cue: string) => void) | undefined
+const tileSelect = byId<HTMLSelectElement>('tile-count')
+const effectSelect = byId<HTMLSelectElement>('refresh-effect')
+let tileCount = Number(tileSelect.value) as TileCount
+let activeCount = tileCount
+let effect: RefreshEffect = 'Fitted'
+let submitToGlasses: ((frame: Uint8Array, cue: string, count: TileCount) => void) | undefined
 let activeFrame: Uint8Array
 let activeCue = ' '
 
@@ -120,6 +125,22 @@ function moveMap(direction: 1 | -1) {
 
 function chooseMapMode(id: number) {
   if (stage !== 3 || !saved) return
+  if (id === layoutMenuItem.itemID) {
+    opticsOpen = false
+    tileCount = tileCount === 1 ? 4 : (tileCount - 1) as TileCount
+    tileSelect.value = String(tileCount)
+    updateMapControls()
+    showMapCue(`${tileCount} image ${tileCount === 1 ? 'tile' : 'tiles'}`)
+    return
+  }
+  if (id === effectMenuItem.itemID) {
+    opticsOpen = false
+    effect = refreshEffects[(refreshEffects.indexOf(effect) + 1) % refreshEffects.length]
+    effectSelect.value = effect
+    updateMapControls()
+    showMapCue(effect)
+    return
+  }
   if (id === opticsMenuItem.itemID) {
     opticsOpen = !opticsOpen
     showOpticsTarget = true
@@ -131,13 +152,17 @@ function chooseMapMode(id: number) {
   if (!mode) return
   opticsOpen = false
   mapMode = mode
-  mapCue = `${mode.itemName}  |  ${mode.up} / ${mode.down}`
+  updateMapControls()
+  showMapCue(`${mode.itemName}  |  ${mode.up} / ${mode.down}`)
+}
+
+function showMapCue(cue: string) {
+  mapCue = cue
   clearTimeout(cueTimer)
   cueTimer = setTimeout(() => {
     mapCue = ' '
     refreshPreview()
   }, 2400)
-  updateMapControls()
   refreshPreview()
 }
 const opacityPresets = [...opacityOptions]
@@ -284,12 +309,41 @@ function paint(canvas: HTMLCanvasElement, frame: Uint8Array) {
 
 function showPreview() {
   if (original.checked && !opticsOpen) preview.getContext('2d')!.drawImage(source, 0, 0)
-  else paint(preview, activeFrame)
+  else {
+    paint(preview, activeFrame)
+    if (activeCount !== 4) {
+      const [first] = imageLayout(activeCount)
+      const ctx = preview.getContext('2d')!
+      ctx.fillStyle = 'black'
+      ctx.fillRect(0, 0, width, first.yPosition)
+      ctx.fillRect(0, first.yPosition + first.height, width, first.yPosition)
+      ctx.fillRect(0, first.yPosition, first.xPosition, first.height)
+      ctx.fillRect(width - first.xPosition, first.yPosition, first.xPosition, first.height)
+    }
+  }
+}
+
+function updateTileGuides() {
+  const layout = imageLayout(activeCount)
+  const areaWidth = Math.max(...layout.map(tile => tile.xPosition + tile.width)) -
+    Math.min(...layout.map(tile => tile.xPosition))
+  const areaHeight = activeCount === 4 ? height : layout[0].height
+  byId('image-coverage').textContent = `${areaWidth} × ${areaHeight} image area`
+  byId('tile-guides').replaceChildren(...layout.map(tile => {
+    const guide = document.createElement('span')
+    guide.style.left = `${100 * tile.xPosition / width}%`
+    guide.style.top = `${100 * tile.yPosition / height}%`
+    guide.style.width = `${100 * tile.width / width}%`
+    guide.style.height = `${100 * tile.height / height}%`
+    return guide
+  }))
 }
 
 function refreshPreview() {
   const previous = activeFrame
   const previousCue = activeCue
+  const previousCount = activeCount
+  activeCount = opticsOpen ? 4 : tileCount
   activeCue = stage === 3 && saved && !opticsOpen ? mapCue : ' '
   if (stage < 3) {
     const value = dialPosition()
@@ -301,10 +355,13 @@ function refreshPreview() {
   }
   activeFrame = opticsOpen && showOpticsTarget
     ? opticsTarget
-    : renderFrame(sourcePixels, profile(selected[stage] ?? 0))
+    : renderFrame(sourcePixels, profile(selected[stage] ?? 0), stage === 3 && saved && !opticsOpen ? effect : 'Fitted')
   if (previous && activeFrame.every((pixel, index) => pixel === previous[index])) activeFrame = previous
   showPreview()
-  if (activeFrame !== previous || activeCue !== previousCue) submitToGlasses?.(activeFrame, activeCue)
+  if (!previous || activeCount !== previousCount) updateTileGuides()
+  if (activeFrame !== previous || activeCue !== previousCue || activeCount !== previousCount) {
+    submitToGlasses?.(activeFrame, activeCue, activeCount)
+  }
 }
 
 function refresh(focusChoice = false) {
@@ -435,8 +492,17 @@ byId('reset').onclick = () => {
   refresh()
 }
 original.onchange = showPreview
+effectSelect.replaceChildren(...refreshEffects.map(name => new Option(name, name)))
+effectSelect.onchange = () => {
+  effect = effectSelect.value as RefreshEffect
+  refreshPreview()
+}
+tileSelect.onchange = () => {
+  tileCount = Number(tileSelect.value) as TileCount
+  refreshPreview()
+}
 byId<HTMLInputElement>('seams').onchange = event => {
-  byId('screen').classList.toggle('seams', (event.target as HTMLInputElement).checked)
+  byId('tile-guides').hidden = !(event.target as HTMLInputElement).checked
 }
 fileInput.onchange = async () => {
   const file = fileInput.files?.[0]
@@ -509,7 +575,8 @@ const sampleOnly = new URLSearchParams(location.search).get('sample') === '1'
 if (sampleOnly) loadingDefaultMap = false
 const sourceReady = sampleOnly ? Promise.resolve() : loadDefaultMap()
 const status = (message: string) => { byId('device').textContent = message }
-void Promise.all([connectGlasses(input, status, chooseMapMode), sourceReady]).then(([send]) => {
+const report = (message: string) => { byId('transfer-stats').textContent = message }
+void Promise.all([connectGlasses(input, status, chooseMapMode, activeCount, report), sourceReady]).then(([send]) => {
   submitToGlasses = send
-  send(activeFrame, activeCue)
+  send(activeFrame, activeCue, activeCount)
 }).catch(error => status(String(error)))

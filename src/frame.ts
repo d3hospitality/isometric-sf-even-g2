@@ -9,17 +9,33 @@ export const tiles = [
   { containerID: 5, containerName: 'bottom-left', xPosition: 0, yPosition: tileHeight },
 ]
 
-export function splitFrame(frame: Uint8Array) {
+export type TileCount = 1 | 2 | 3 | 4
+
+export function imageLayout(count: TileCount) {
+  if (count === 4) return tiles.map(tile => ({ ...tile, width: tileWidth, height: tileHeight }))
+  const tileW = count === 1 ? 288 : count === 2 ? 216 : 192
+  const left = (width - count * tileW) / 2
+  return Array.from({ length: count }, (_, index) => ({
+    containerID: index + 2, containerName: `strip-${index + 1}`,
+    xPosition: left + index * tileW, yPosition: (height - tileHeight) / 2,
+    width: tileW, height: tileHeight,
+  }))
+}
+
+export function splitFrame(frame: Uint8Array, count: TileCount = 4) {
   if (frame.length !== width * height) throw new Error('Expected a 576 × 288 frame')
-  return tiles.map(tile => {
-    const pixels = new Uint8Array(tileWidth * tileHeight)
-    for (let y = 0; y < tileHeight; y++) {
+  return imageLayout(count).map(tile => {
+    const pixels = new Uint8Array(tile.width * tile.height)
+    for (let y = 0; y < tile.height; y++) {
       const offset = (tile.yPosition + y) * width + tile.xPosition
-      pixels.set(frame.subarray(offset, offset + tileWidth), y * tileWidth)
+      pixels.set(frame.subarray(offset, offset + tile.width), y * tile.width)
     }
     return pixels
   })
 }
+
+export const refreshEffects = ['Fitted', 'No dither', 'Flat 8 tones'] as const
+export type RefreshEffect = typeof refreshEffects[number]
 
 export const opacityOptions = [0.45, 0.6, 0.8, 1]
 export const levelsOptions = [
@@ -48,25 +64,26 @@ export function luminance(rgba: Uint8ClampedArray) {
   return output
 }
 
-export function renderFrame(source: Float32Array, profile: Profile) {
+export function renderFrame(source: Float32Array, profile: Profile, effect: RefreshEffect = 'Fitted') {
+  const dither = effect === 'Fitted' ? profile.dither : 0
   const values = source.map(value => 15 * Math.pow(
     clamp((value * profile.opacity - profile.black) / (profile.white - profile.black)),
     1 / profile.gamma,
   ))
   const output = new Uint8Array(values.length)
-  const matrix = profile.dither === 1 ? bayer2 : bayer4
-  const size = profile.dither === 1 ? 2 : 4
+  const matrix = dither === 1 ? bayer2 : bayer4
+  const size = dither === 1 ? 2 : 4
   const strength = profile.ditherStrength ?? 1
   for (let i = 0; i < values.length; i++) {
     const x = i % width
     const y = Math.floor(i / width)
     let value = values[i]
-    if (profile.dither === 1 || profile.dither === 2) {
+    if (dither === 1 || dither === 2) {
       value += ((matrix[(y % size) * size + x % size] + 0.5) / matrix.length - 0.5) * strength
     }
     const level = Math.max(0, Math.min(15, Math.round(value)))
-    output[i] = level
-    if (profile.dither === 3) {
+    output[i] = effect === 'Flat 8 tones' ? Math.round(Math.round(level * 7 / 15) * 15 / 7) : level
+    if (dither === 3) {
       const error = (value - level) * strength / 16
       if (x + 1 < width) values[i + 1] += error * 7
       if (i + width >= values.length) continue

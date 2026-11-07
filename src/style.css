@@ -10,9 +10,9 @@ section { background: #1a241e; border: 1px solid #33443a; border-radius: 14px; p
 .row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
 #screen { position: relative; background: black; margin: 12px 0; }
 canvas { width: 100%; display: block; image-rendering: pixelated; }
-#screen.seams::before, #screen.seams::after { content: ''; position: absolute; pointer-events: none; }
-#screen.seams::before { inset: 0 50% 0 auto; border-left: 1px dashed #ffe17a; }
-#screen.seams::after { inset: 50% 0 auto 0; border-top: 1px dashed #ffe17a; }
+#tile-guides { position: absolute; inset: 0; pointer-events: none; }
+#tile-guides span { position: absolute; border: 1px dashed #ffe17a; }
+.tools select { padding: 4px; margin-left: 4px; }
 .tools, footer { font-size: .85rem; }
 .file { color: #c7edcb; }
 .file input { display: block; width: min(100%, 240px); }

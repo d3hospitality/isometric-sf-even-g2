@@ -4,7 +4,7 @@ A map viewer and display fitting prototype for the Even G2. It opens in downtown
 
 ## Screenshots
 
-The screenshots use the included original calibration map. Open the app with `?sample=1` to reproduce them.
+The screenshots use the included original calibration map and the four-tile display. Open the app with `?sample=1` and select four image containers to reproduce the map view.
 
 | Web app | Even Hub simulator |
 | --- | --- |
@@ -33,6 +33,23 @@ Open http://localhost:5173. Select an A–D starting preset on the phone, then u
 
 Zoom out before traversing long stretches of the map. **Reset view** on the phone returns to the original downtown view.
 
+## Compare refresh speed
+
+Choose **Image containers** and **Refresh effect** on the phone, or use **Cycle image tiles** and **Cycle refresh effect** in the G2 contextual menu.
+
+| Containers | Image area | Pixels sent on a full refresh |
+| --- | --- | ---: |
+| 4 | Full 576 × 288 display | 165,888 |
+| 3 | Centered 576 × 144 strip | 82,944 |
+| 2 (default) | Centered 432 × 144 strip | 62,208 |
+| 1 | Centered 288 × 144 crop | 41,472 |
+
+The smaller layouts crop the view at the same scale. **Fitted** uses the saved profile. **No dither** preserves the tonal settings and removes dithering. **Flat 8 tones** also limits output to eight brightness levels. The last two effects trade tonal detail for simpler PNGs and leave the saved fit intact. Optics check temporarily uses the full four-tile display and the fitted map so the comparison target stays complete.
+
+The companion page reports the tiles sent, PNG payload size before transport, and time spent encoding and waiting for SDK calls. It excludes layout rebuild, map fetching, debounce, and lens response time. Compare the same movement at each setting. Actual glasses refresh speed depends on the map, firmware, and Bluetooth connection.
+
+On the included calibration map, a full PNG update was 62.0 KiB with four containers and the fitted effect, 32.8 KiB with two containers and the fitted effect, and 23.7 KiB with two containers and Flat 8 tones. Those numbers measure PNG payload size before Bluetooth transport.
+
 ## Check the image on physical G2 lenses
 
 1. With the map locked, tap then hold and select **Optics check**. Swipe up for the reference target and down for the map at the same position and zoom. Select **Optics check** again to return to navigation.
@@ -54,7 +71,7 @@ npx --package @evenrealities/evenhub-simulator evenhub-simulator http://localhos
 ## Source and display
 
 - The app reads the bounds from [Justin Chavez’s Isometric SF](https://justinchavez.github.io/sf-isometric-demo/) and fetches the visible 512 px tiles directly from the source site. It uses the site’s overview at wide zoom levels. The artwork stays on the original site and is absent from this repository. If the source is unavailable at launch, the original calibration sample appears with a notice. **Load authorized map image** accepts a 2:1 export or center-crops a larger image to fit.
-- The renderer computes luminance, applies opacity against black and Levels, then quantizes with the selected dithering treatment. It processes the whole 576 × 288 frame before splitting it into top-left, top-right, bottom-right, and bottom-left tiles. This preserves diffusion across boundaries. The SDK receives four lossless grayscale PNGs in sequence. Pending frames coalesce during a transfer. Tile updates may briefly show a mixed frame on hardware.
+- The renderer computes luminance, applies opacity against black and Levels, then quantizes before cutting the selected image layout. This preserves diffusion across tile boundaries. The SDK receives changed tiles as lossless grayscale PNGs in sequence. New movement replaces pending frames, and a newer frame can take over between tile sends. Tile updates may briefly show a mixed frame on hardware.
 - In the phone preview, **Show tile boundaries** draws guides over the joins. **Show source color** changes only the phone preview. The display profile is selected by eye on the glasses.
 
 ## Verification

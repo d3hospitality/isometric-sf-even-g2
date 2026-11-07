@@ -18,13 +18,26 @@
         <strong id="source-label">Original isometric sample</strong>
         <span class="tag">576 × 288 · 16 levels</span>
       </div>
-      <div id="screen"><canvas id="preview" aria-label="Current glasses preview"></canvas></div>
+      <div id="screen"><canvas id="preview" aria-label="Current glasses preview"></canvas><div id="tile-guides" aria-hidden="true" hidden></div></div>
       <div class="row tools">
         <label><input type="checkbox" id="seams"> Show tile boundaries</label>
         <label><input type="checkbox" id="original"> Show source color</label>
         <label class="file">Load authorized map image<input id="source" type="file" accept="image/*"></label>
       </div>
       <p id="source-error" role="alert" hidden></p>
+      <div class="row tools">
+        <label>Image containers
+          <select id="tile-count">
+            <option value="4">4 · Full display</option>
+            <option value="3">3 · Wide strip</option>
+            <option value="2" selected>2 · Medium strip</option>
+            <option value="1">1 · Compact</option>
+          </select>
+        </label>
+        <label>Refresh effect <select id="refresh-effect"></select></label>
+        <span id="image-coverage"></span>
+      </div>
+      <p id="transfer-stats" class="tag" aria-live="polite"></p>
     </section>
     <section aria-labelledby="heading">
       <div class="row"><p id="stepper" class="eyebrow"></p><span class="tag">FITTING</span></div>
