@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111915">
+  <title>Isometric SF · G2 Fitting Lab</title>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">EVEN G2 / DISPLAY CALIBRATION</p>
+      <h1>Isometric SF Fitting Lab</h1>
+      <p>Choose the treatments that keep streets and buildings legible through the lenses.</p>
+    </header>
+    <section aria-label="Map preview">
+      <div class="row">
+        <strong id="source-label">Original isometric sample</strong>
+        <span class="tag">576 × 288 · 16 levels</span>
+      </div>
+      <div id="screen"><canvas id="preview" aria-label="Current glasses preview"></canvas></div>
+      <div class="row tools">
+        <label><input type="checkbox" id="seams"> Show tile boundaries</label>
+        <label><input type="checkbox" id="original"> Show source color</label>
+        <label class="file">Load authorized map image<input id="source" type="file" accept="image/*"></label>
+      </div>
+      <p id="source-error" role="alert" hidden></p>
+    </section>
+    <section aria-labelledby="heading">
+      <div class="row"><p id="stepper" class="eyebrow"></p><span class="tag">FITTING</span></div>
+      <h2 id="heading"></h2>
+      <p id="hint"></p>
+      <div id="map-controls" class="map-controls" hidden>
+        <div id="map-modes" role="group" aria-label="Swipe mode"></div>
+        <div class="row">
+          <button id="map-up"></button>
+          <button id="map-down"></button>
+          <button id="map-home">Reset view</button>
+        </div>
+        <p id="map-help">On G2, tap then hold to open the contextual menu.</p>
+        <p id="map-load-status" role="status"></p>
+      </div>
+      <label id="scale" class="scale">
+        <span id="scale-label"></span>
+        <input id="dial" type="range" min="0" max="100" step="2.5">
+        <output id="dial-value" for="dial"></output>
+      </label>
+      <div id="choices" class="choices" aria-label="Fitting candidates"></div>
+      <details id="tuning" hidden>
+        <summary>Fine-tune the selected preset</summary>
+        <form id="tuning-form" class="row tools"></form>
+        <p id="tuning-error" role="alert" hidden></p>
+      </details>
+      <div class="row actions">
+        <button id="back">Back</button>
+        <button id="reset">Reset profile</button>
+        <button id="confirm" class="primary">Confirm</button>
+      </div>
+    </section>
+    <footer>
+      <p id="device" role="status">Browser preview · open in Even Hub to connect glasses</p>
+      <p>Map reference by <a href="https://justinchavez.github.io/sf-isometric-demo/">Justin Chavez</a></p>
+    </footer>
+  </main>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+:root { color-scheme: dark; font: 16px/1.45 system-ui, sans-serif; background: #111915; color: #ecf5ee; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 840px; margin: auto; padding: 32px 20px; }
+h1, h2, p { margin: 0 0 .5em; }
+h1 { font-size: clamp(1.8rem, 5vw, 3rem); line-height: 1.1; }
+p, .tools, footer { color: #b7c6bb; }
+.eyebrow, .tag { color: #a1d7ac; font: 650 .75rem/1.45 ui-monospace, monospace; letter-spacing: .055em; }
+section { background: #1a241e; border: 1px solid #33443a; border-radius: 14px; padding: clamp(12px, 3vw, 22px); margin-top: 20px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+#screen { position: relative; background: black; margin: 12px 0; }
+canvas { width: 100%; display: block; image-rendering: pixelated; }
+#screen.seams::before, #screen.seams::after { content: ''; position: absolute; pointer-events: none; }
+#screen.seams::before { inset: 0 50% 0 auto; border-left: 1px dashed #ffe17a; }
+#screen.seams::after { inset: 50% 0 auto 0; border-top: 1px dashed #ffe17a; }
+.tools, footer { font-size: .85rem; }
+.file { color: #c7edcb; }
+.file input { display: block; width: min(100%, 240px); }
+.choices { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
+button { font: inherit; color: inherit; background: #243229; border: 1px solid #506555; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+button:disabled { opacity: .4; cursor: default; }
+.choice { padding: 5px; text-align: left; font-size: .85rem; }
+.choice span { display: block; padding: 5px; }
+.choice[aria-pressed=true] { border-color: #a5eab2; box-shadow: inset 0 0 0 1px #a5eab2; }
+.primary { background: #a5eab2; border-color: #a5eab2; color: #13291b; font-weight: 700; margin-left: auto; }
+footer { margin-top: 16px; }
+details { margin-bottom: 14px; }
+summary { cursor: pointer; }
+form { margin-top: 8px; justify-content: flex-start !important; }
+form input { width: 5rem; margin-left: 5px; }
+.scale { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.scale[hidden] { display: none; }
+.scale input { flex: 1; min-width: 100px; accent-color: #a5eab2; }
+.scale output { min-width: 4ch; font: 650 1rem ui-monospace, monospace; }
+.map-controls { margin: 12px 0; }
+.map-controls button { margin: 0 5px 6px 0; }
+.map-controls button[aria-pressed=true] { border-color: #a5eab2; color: #a5eab2; }
+.map-controls .row { justify-content: flex-start; }
+a { color: #a5eab2; }
+@media (max-width: 500px) { .choices { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
